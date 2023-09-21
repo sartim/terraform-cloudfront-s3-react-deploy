@@ -1,0 +1,68 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 1
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v1
+      with:
+        node-version: ${{ matrix.node-version }}
+    - run: npx install
+    - name: Run build
+      run: react-scripts build
+      env:
+        CI: false
+    - name: Test with pytest
+      run: |
+        react-scripts test
+  deploy:
+    runs-on: ubuntu-latests
+    needs: test
+    strategy:
+      max-parallel: 1
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 1
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v1
+      with:
+        node-version: ${{ matrix.node-version }}
+    - name: Setup CI/CD Server
+      run: |
+        sudo apt-get update &&
+        sudo apt-get install -y gnupg software-properties-common
+        sudo apt-get install -y awscli
+    - name: Install dependencies
+      run: |
+        npx install
+    - name: Run build
+      run: react-scripts build
+      env:
+        CI: false
+    - uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+    - name: Run terraform
+      run: |
+        terraform validate
+        terraform apply
+      env:
+        TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+        TF_VAR_acm_certificate_arn: ${{ secrets.ACM_CERT_ARN }}
+        TF_VAR_domain: ${{ secrets.DOMAIN }}
+        TF_VAR_s3_bucket: ${{ secrets.PROD_S3_URI }}
+    - name: Deploy to Stage S3 Bucket
+      run: |
+        cp src/components/pages/error/404.html  ./build
+        aws s3 cp ./build ${{ secrets.PROD_S3_URI }} --recursive --acl public-read --region ${{ secrets.AWS_REGION }}
