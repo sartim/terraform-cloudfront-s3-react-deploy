@@ -30,3 +30,7 @@ gen
 
 # IDE
 vscode
+
+# Lock
+package-lock.json
+yarn.lock
