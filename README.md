@@ -1,4 +1,4 @@
-# Deploying React App on AWS CloudFront suing S3Bucket Website Endpoint
+# Deploying React App on AWS CloudFront uing S3Bucket Website Endpoint
 
 This is a basic repo which demonstrates setting an infrastructure using:
 
@@ -6,4 +6,4 @@ This is a basic repo which demonstrates setting an infrastructure using:
 * AWS Certificate Manager
 * AWS S3
 
-to be deployable as static files
+to be deployable as static files.
