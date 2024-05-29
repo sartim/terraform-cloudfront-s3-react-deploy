@@ -1,51 +1,69 @@
-resource "aws_cloudfront_distribution" "terraform_cloudfront_s3_react_deploy" {
+resource "aws_cloudfront_cache_policy" "app" {
+  name        = "App-Managed-CachingDisabled"
+  comment     = "Managed-CachingDisabled"
+  default_ttl = 50
+  max_ttl     = 100
+  min_ttl     = 1
+
+  parameters_in_cache_key_and_forwarded_to_origin {
+    cookies_config {
+      cookie_behavior = "none"
+    }
+    headers_config {
+      header_behavior = "none"
+    }
+    query_strings_config {
+      query_string_behavior = "none"
+    }
+  }
+}
+
+resource "aws_cloudfront_distribution" "app" {
   origin {
-    domain_name = aws_s3_bucket.terraform_cloudfront_s3_react_deploy.website_endpoint
+    domain_name = aws_s3_bucket_website_configuration.app.website_endpoint
+    origin_id   = aws_s3_bucket_website_configuration.app.website_endpoint
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "http-only"
+      origin_ssl_protocols   = ["TLSv1", "TLSv1.1", "TLSv1.2"]
+    }
   }
 
   enabled             = true
   is_ipv6_enabled     = true
-  comment = "Terraform CloudFront S3 React Deploy Demo"
+  comment             = "app"
   default_root_object = "index.html"
-  wait_for_deployment = false
 
-  custom_error_response = {
-    error403 = {
-      error_code         = 403
-      response_code      = 404
-      response_page_path = "/404.html"
-    }
-    error404 = {
-      error_code         = 404
-      response_code      = 404
-      response_page_path = "/404.html"
+  aliases = [var.domain]
+
+  default_cache_behavior {
+    allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = aws_s3_bucket_website_configuration.app.website_endpoint
+    cache_policy_id = aws_cloudfront_cache_policy.app.id
+    viewer_protocol_policy = "redirect-to-https"
+    min_ttl                = 31536000
+    default_ttl            = 31536000
+    max_ttl                = 31536000
+  }
+
+  price_class = "PriceClass_All"
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
     }
   }
 
-  default_cache_behavior {
-    target_origin_id = aws_s3_bucket.terraform_cloudfront_s3_react_deploy.id
-
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
-    cached_methods         = ["GET", "HEAD"]
-    compress        = true
-
-    forwarded_values {
-      query_string = false
-      cookies {
-        forward = "none"
-      }
-    }
-
-    min_ttl    = 3600
-    default_ttl = 3600
-    max_ttl    = 7200
+  tags = {
+    Environment = "production"
   }
 
   viewer_certificate {
     acm_certificate_arn = var.acm_certificate_arn
     ssl_support_method = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
   }
-
-  aliases = [var.domain]
 }
